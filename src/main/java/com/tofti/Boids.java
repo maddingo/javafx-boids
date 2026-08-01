@@ -1,8 +1,5 @@
 package com.tofti;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
-import com.sun.javafx.perf.PerformanceTracker;
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.beans.value.ChangeListener;
@@ -16,10 +13,7 @@ import javafx.scene.shape.Sphere;
 import javafx.stage.Stage;
 
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
-import java.util.Random;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -29,10 +23,9 @@ public class Boids extends Application {
         Application.launch(args);
     }
 
-    private static int DEFAULT_WINDOW_WIDTH = 1024;
-    private static int DEFAULT_WINDOW_HEIGHT = 768;
-    private static boolean USE_DEPTH_BUFFER = true;
-    private static double DEBUG_MARKER_SIZE = 5;
+    private static final int DEFAULT_WINDOW_WIDTH = 1024;
+    private static final int DEFAULT_WINDOW_HEIGHT = 768;
+    private static final double DEBUG_MARKER_SIZE = 5;
 
     static class Boid {
         public static final boolean COLOR_SENSITIVE_DEFAULT = false;
@@ -42,8 +35,8 @@ public class Boids extends Application {
         double xBound;
         double yBound;
 
-        double aligmentWeight;
-        double seperationWeight;
+        double alignmentWeight;
+        double separationWeight;
         double cohesionWeight;
 
         boolean colorSensitive;
@@ -58,8 +51,7 @@ public class Boids extends Application {
         static final int RADIUS = 5;
         static final double TRI_SIZE = 8d;
 
-        static final double SEPERATION_DISTANCE = 10 * TRI_SIZE;
-        static final double ALIGNMENT_DISTANCE = 15 * TRI_SIZE;
+        static final double SEPARATION_DISTANCE = 10 * TRI_SIZE;
         static final double CENTER_OF_MASS_NEIGHBORHOOD = 25 * TRI_SIZE;
         static final double DEFAULT_WEIGHT = 0.5d;
         static final double MAX_WEIGHT = 3d;
@@ -74,7 +66,7 @@ public class Boids extends Application {
                 = lb -> lb.stream().map(TO_VELOCITY_VECTOR_2D).collect(Collectors.toList());
 
         static final Random RNG = new Random(System.currentTimeMillis());
-        static final ImmutableList<Color> COLORS = ImmutableList.of(Color.RED, Color.GREEN, Color.BLUE, Color.CYAN);
+        static final List<Color> COLORS = List.of(Color.RED, Color.GREEN, Color.BLUE, Color.CYAN);
 
         Boid(double locX, double locY, double xBound, double yBound) {
             this.location = new Vector2D(locX, locY);
@@ -83,14 +75,14 @@ public class Boids extends Application {
             this.velocity = new Vector2D(RNG.nextDouble() * MAX_VELOCITY - 0.5 * MAX_VELOCITY,
                                          RNG.nextDouble() * MAX_VELOCITY- 0.5 * MAX_VELOCITY);
 
-            this.setAligmentWeight(DEFAULT_WEIGHT);
-            this.setSeperationWeight(DEFAULT_WEIGHT);
+            this.setAlignmentWeight(DEFAULT_WEIGHT);
+            this.setSeparationWeight(DEFAULT_WEIGHT);
             this.setCohesionWeight(DEFAULT_WEIGHT);
             this.setColorSensitive(COLOR_SENSITIVE_DEFAULT);
 
             this.sphere = new Sphere(RADIUS);
             this.poly = new Polygon();
-            poly.getPoints().addAll(new Double[]{0.0, TRI_SIZE, TRI_SIZE, -TRI_SIZE, -TRI_SIZE, -TRI_SIZE });
+            poly.getPoints().addAll(0.0, TRI_SIZE, TRI_SIZE, -TRI_SIZE, -TRI_SIZE, -TRI_SIZE);
             poly.setCache(true);
             poly.setCacheHint(CacheHint.SPEED);
 
@@ -98,28 +90,20 @@ public class Boids extends Application {
             poly.setFill(color);
         }
 
-        public void setAligmentWeight(double aligmentWeight) {
-            this.aligmentWeight = aligmentWeight;
+        public void setAlignmentWeight(double alignmentWeight) {
+            this.alignmentWeight = alignmentWeight;
         }
 
-        public void setSeperationWeight(double seperationWeight) {
-            this.seperationWeight = seperationWeight;
+        public void setSeparationWeight(double separationWeight) {
+            this.separationWeight = separationWeight;
         }
 
         public void setCohesionWeight(double cohesionWeight) {
             this.cohesionWeight = cohesionWeight;
         }
 
-        public double getXBound() {
-            return xBound;
-        }
-
         public void setXBound(double xBound) {
             this.xBound = xBound;
-        }
-
-        public double getYBound() {
-            return yBound;
         }
 
         public void setYBound(double yBound) {
@@ -137,23 +121,17 @@ public class Boids extends Application {
         }
 
         void update(List<Boid> all) {
-            List<Boid> others = Lists.newArrayList(all);
+            List<Boid> others = new ArrayList<>(all);
             others.remove(this);
 
             Optional<Vector2D> centreOfMassAdj = centreOfMassVelocity(others, cohesionWeight);
-            if(centreOfMassAdj.isPresent()) {
-                velocity = velocity.plus(centreOfMassAdj.get());
-            }
+            centreOfMassAdj.ifPresent(vector2D -> velocity = velocity.plus(vector2D));
 
-            Optional<Vector2D> avoidOthersAdj = avoidOthersAdj(others, seperationWeight);
-            if(avoidOthersAdj.isPresent()) {
-                velocity = velocity.plus(avoidOthersAdj.get());
-            }
+            Optional<Vector2D> avoidOthersAdj = avoidOthersAdj(others, separationWeight);
+            avoidOthersAdj.ifPresent(vector2D -> velocity = velocity.plus(vector2D));
 
-            Optional<Vector2D> alignmentAdj = alignmentAdj(others, aligmentWeight);
-            if(alignmentAdj.isPresent()) {
-                velocity = velocity.plus(alignmentAdj.get());
-            }
+            Optional<Vector2D> alignmentAdj = alignmentAdj(others, alignmentWeight);
+            alignmentAdj.ifPresent(vector2D -> velocity = velocity.plus(vector2D));
 
             if(RNG.nextDouble() < 0.01) {
                 velocity = velocity.plus(new Vector2D(RNG.nextDouble() - 0.5, RNG.nextDouble() - 0.5).normalizeTo(0.5));
@@ -170,7 +148,7 @@ public class Boids extends Application {
             }
 
             List<Boid> othersWithinDistance
-                    = boidsWithinDistance(boids, this, SEPERATION_DISTANCE);
+                    = boidsWithinDistance(boids, this, SEPARATION_DISTANCE);
             if(othersWithinDistance.isEmpty()) {
                 return Optional.empty();
             }
@@ -183,7 +161,7 @@ public class Boids extends Application {
                 return Optional.empty();
             }
             List<Boid> othersWithinDistance
-                    = boidsWithinDistance(boids, this, SEPERATION_DISTANCE);
+                    = boidsWithinDistance(boids, this, SEPARATION_DISTANCE);
 
             if(othersWithinDistance.isEmpty()) {
                 return Optional.empty();
@@ -200,7 +178,7 @@ public class Boids extends Application {
 
         private Optional<Vector2D> centreOfMassVelocity(List<Boid> all, double magnitude) {
             Optional<Vector2D> center = getCentreOfMass(all, this);
-            if(!center.isPresent()) {
+            if(center.isEmpty()) {
                 return center;
             }
             Vector2D v = center.get().minus(location);
@@ -246,7 +224,7 @@ public class Boids extends Application {
         }
 
         List<Node> getNodes() {
-            return Arrays.asList(poly);
+            return Collections.singletonList(poly);
         }
 
         public void setColorSensitive(Boolean colorSensitive) {
@@ -260,17 +238,16 @@ public class Boids extends Application {
         return tl;
     }
 
-    static  List<Rectangle> reinitDebugMarkersInCorner( List<Rectangle> nodes, double xBound, double yBound) {
+    static  void reinitDebugMarkersInCorner( List<Rectangle> nodes, double xBound, double yBound) {
         nodes.clear();
         nodes.add(addDebugMarkers( 0, 0, DEBUG_MARKER_SIZE , DEBUG_MARKER_SIZE));
         nodes.add(addDebugMarkers( xBound-DEBUG_MARKER_SIZE, 0, DEBUG_MARKER_SIZE , DEBUG_MARKER_SIZE));
         nodes.add(addDebugMarkers( xBound-DEBUG_MARKER_SIZE, yBound-DEBUG_MARKER_SIZE, DEBUG_MARKER_SIZE , DEBUG_MARKER_SIZE));
         nodes.add(addDebugMarkers( 0, yBound-DEBUG_MARKER_SIZE, DEBUG_MARKER_SIZE , DEBUG_MARKER_SIZE));
-        return nodes;
     }
 
     List<Boid> initRandomBoids(final int n) {
-        List<Boid> boids = Lists.newArrayList();
+        List<Boid> boids = new ArrayList<>();
         Random rand = new Random();
         for (int i = 0 ; i < n ; i++) {
             boids.add(new Boid(rand.nextDouble() * DEFAULT_WINDOW_WIDTH,
@@ -281,19 +258,12 @@ public class Boids extends Application {
         return boids;
     }
 
-    List<Boid> initAFewBoids() {
-        List<Boid> boids = Lists.newArrayList();
-        boids.add(new Boid(150, 150, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT));
-        boids.add(new Boid(5,DEFAULT_WINDOW_HEIGHT-5, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT));
-        return boids;
-    }
-
     void reinit(List<Boid> boids, Group root, List<Slider> sliders) {
-        root.getChildren().removeAll(boids.stream().map(Boid::getNodes).flatMap(l -> l.stream()).collect(Collectors.toList()));
+        root.getChildren().removeAll(boids.stream().map(Boid::getNodes).flatMap(Collection::stream).toList());
         boids.clear();
         boids.addAll(initRandomBoids(1));
-        root.getChildren().addAll(boids.stream().map(Boid::getNodes).flatMap(l -> l.stream()).collect(Collectors.toList()));
-        sliders.stream().forEach(s -> s.valueProperty().set(Boid.DEFAULT_WEIGHT));
+        root.getChildren().addAll(boids.stream().map(Boid::getNodes).flatMap(Collection::stream).toList());
+        sliders.forEach(s -> s.valueProperty().set(Boid.DEFAULT_WEIGHT));
     }
 
     @Override
@@ -301,25 +271,26 @@ public class Boids extends Application {
         PerspectiveCamera camera = new PerspectiveCamera(false);
 
         Group root = new Group();
+        boolean USE_DEPTH_BUFFER = true;
         Scene scene = new Scene(root, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, USE_DEPTH_BUFFER);
         final ContextMenu contextMenu = new ContextMenu();
-        final List<Boid> boids = Lists.newArrayList();
+        final List<Boid> boids = new ArrayList<>();
 
         Slider alignmentSlider = new Slider();
         List<CustomMenuItem> alignmentControls = buildLabelAndSlider(alignmentSlider, "Alignment: %.3f", 0.1,
-                Boid.MAX_WEIGHT, (ov, old_val, new_val) -> boids.forEach(b -> b.setAligmentWeight(new_val.doubleValue())));
+                Boid.MAX_WEIGHT, (ov, old_val, new_val) -> boids.forEach(b -> b.setAlignmentWeight(new_val.doubleValue())));
 
         Slider cohesionSlider = new Slider();
         List<CustomMenuItem> cohesionControls = buildLabelAndSlider(cohesionSlider, "Cohesion: %.3f", 0.1, Boid.MAX_WEIGHT,
                 (ov, old_val, new_val) -> boids.forEach(b -> b.setCohesionWeight(new_val.doubleValue())));
 
         Slider seperationSlider = new Slider();
-        List<CustomMenuItem> seperationControls = buildLabelAndSlider(seperationSlider, "Seperation: %.3f", 0.1, Boid.MAX_WEIGHT,
-                (ov, old_val, new_val) -> boids.forEach(b -> b.setSeperationWeight(new_val.doubleValue())));
+        List<CustomMenuItem> separationControls = buildLabelAndSlider(seperationSlider, "Seperation: %.3f", 0.1, Boid.MAX_WEIGHT,
+                (ov, old_val, new_val) -> boids.forEach(b -> b.setSeparationWeight(new_val.doubleValue())));
 
         contextMenu.getItems().addAll(alignmentControls);
         contextMenu.getItems().addAll(cohesionControls);
-        contextMenu.getItems().addAll(seperationControls);
+        contextMenu.getItems().addAll(separationControls);
 
         final List<Slider> allSliders = Arrays.asList(alignmentSlider, cohesionSlider, seperationSlider);
 
@@ -350,12 +321,12 @@ public class Boids extends Application {
             }
         });
 
-        final List<Rectangle> debugNodes = Lists.newArrayList();
+        final List<Rectangle> debugNodes = new ArrayList<>();
         reinitDebugMarkersInCorner(debugNodes, scene.getWidth(), scene.getHeight());
         root.getChildren().addAll(debugNodes);
 
         scene.heightProperty().addListener((obs, oldVal, newVal) -> {
-            boids.stream().forEach(b -> b.setYBound(newVal.doubleValue()));
+            boids.forEach(b -> b.setYBound(newVal.doubleValue()));
             root.getChildren().removeAll(debugNodes);
             reinitDebugMarkersInCorner(debugNodes, scene.getWidth(), scene.getHeight());
             root.getChildren().addAll(debugNodes);
@@ -363,7 +334,7 @@ public class Boids extends Application {
         });
 
         scene.widthProperty().addListener((obs, oldVal, newVal) -> {
-            boids.stream().forEach(b -> b.setXBound(newVal.doubleValue()));
+            boids.forEach(b -> b.setXBound(newVal.doubleValue()));
             root.getChildren().removeAll(debugNodes);
             reinitDebugMarkersInCorner(debugNodes, scene.getWidth(), scene.getHeight());
             root.getChildren().addAll(debugNodes);
@@ -376,9 +347,23 @@ public class Boids extends Application {
         stage.setTitle("JavaFX Boids");
 
         AnimationTimer t = new AnimationTimer() {
+            private final long[] frameTimes = new long[100];
+            private int frameIndex = 0;
+            private boolean wrapped = false;
+
             @Override public void handle(long now) {
-                boids.stream().forEach(b -> b.updateAndRender(boids));
-                fpsLabel.setText(String.format("FPS: %.3f", PerformanceTracker.getSceneTracker(scene).getAverageFPS()));
+                boids.forEach(b -> b.updateAndRender(boids));
+
+                long oldest = wrapped ? frameTimes[frameIndex] : frameTimes[0];
+                int intervals = wrapped ? frameTimes.length : frameIndex;
+
+                frameTimes[frameIndex] = now;
+                frameIndex = (frameIndex + 1) % frameTimes.length;
+                wrapped |= frameIndex == 0;
+
+                if (intervals > 0) {
+                    fpsLabel.setText(String.format("FPS: %.3f", intervals * 1_000_000_000.0 / (now - oldest)));
+                }
             }
         };
         t.start();
