@@ -14,5 +14,5 @@ This implementation uses the javafx API to render the boids (see https://docs.or
 
 ### TODO
 - Add obstacles, and obstacle avoidance.
-- Add seperation of model, and view/controller.
+- Add separation of model, and view/controller.
 - Add rendering of neighbourhoods with transparency (so you can see the sphere of influence).
